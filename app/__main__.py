@@ -1,9 +1,11 @@
 '''应用的命令行入口'''
+from app.settings import is_startup_message_enabled
 
 def main() ->None:
     '''执行当前阶段的启动行为'''
-    print('Globex Agent 启动成功！')
-    print('当前阶段：最小python入口')
+    if is_startup_message_enabled():
+        print('Globex Agent 启动成功！')
+        print('当前阶段：最小python入口')
 
 
 if __name__ == '__main__':
