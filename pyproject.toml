@@ -5,7 +5,13 @@ description = "跨境电商Agent从零开始学习的项目"
 readme = "README.md"
 requires-python = ">=3.11,<3.14"
 
-#当前代码只使用python标准库
+#当前代码使用的项目依赖
 dependencies = [
     "python-dotenv==1.2.4",
+]
+
+[dependency-groups]
+#pytest 是测试工具，放在开发依赖组中。
+dev = [
+    "pytest==9.1.1"
 ]
