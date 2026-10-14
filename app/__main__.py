@@ -1,6 +1,6 @@
 '''应用的命令行入口'''
 
-def main():
+def main() ->None:
     '''执行当前阶段的启动行为'''
     print('Globex Agent 启动成功！')
     print('当前阶段：最小python入口')
