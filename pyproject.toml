@@ -1,9 +1,11 @@
 [project]
-name = "globex agent learning"
+name = "globex-agent-learning"
 version = "0.1.0"
 description = "跨境电商Agent从零开始学习的项目"
 readme = "README.md"
 requires-python = ">=3.11,<3.14"
 
 #当前代码只使用python标准库
-dependencies = []
+dependencies = [
+    "python-dotenv==1.2.4",
+]
