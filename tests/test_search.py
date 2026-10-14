@@ -57,3 +57,71 @@ def test_search_preserves_order_and_input_list():
 
     assert matches_ids == ["P004", "P001"]
     assert actual_ids == original_ids
+
+@pytest.mark.parametrize(
+    "max_price_cents, expected_ids",#右边的expected_ids是预期的商品编号列表
+    [
+        (None, ["P004", "P001"]),
+        (19900, ["P004", "P001"]),
+        (15900, ["P004"]),
+        (15899, []),
+        (0, []),
+    ],
+)
+def test_search_filters_by_max_price(max_price_cents, expected_ids):
+    products = create_sample_products()
+    products.insert(
+        0,
+        Product(
+            product_id="P004",
+            name="旅行背包",
+            price_cents=15900,
+        ),
+    )
+
+    matches = search_products(
+        products,
+        "背包",
+        max_price_cents=max_price_cents,
+    )
+
+    actual_ids = []
+    for product in matches:
+        actual_ids.append(product.product_id)
+
+    assert actual_ids == expected_ids
+
+
+def test_search_accepts_zero_budget_for_free_product():
+    product = Product(
+        product_id="P000",
+        name="体验背包",
+        price_cents=0,
+    )
+
+    matches = search_products([product], "背包", max_price_cents=0)
+
+    assert matches == [product]
+
+
+@pytest.mark.parametrize(
+    "max_price_cents",
+    [19900.0, "19900", True, False],
+)
+def test_search_rejects_invalid_budget_type(max_price_cents):
+    with pytest.raises(TypeError, match="最高预算必须为整数分"):
+        search_products(
+            create_sample_products(),
+            "背包",
+            max_price_cents=max_price_cents,
+        )
+
+
+def test_search_rejects_negative_budget():
+    # 即使关键词为空，非法预算也应该报错。
+    with pytest.raises(ValueError, match="最高预算不能为负数"):
+        search_products(
+            create_sample_products(),
+            "",
+            max_price_cents=-1,
+        )
