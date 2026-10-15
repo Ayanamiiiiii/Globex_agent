@@ -15,8 +15,9 @@
 - 商品名称关键词检索、最高预算筛选。
 - 命令行商品检索入口。
 - 订单明细模型：商品名称和单价快照、购买数量校验、整数分小计。
+- 订单草稿模型：组合一条或多条明细，并按整数分汇总总金额。
 
-订单明细目前作为独立领域模型使用，尚未接入命令行下单流程。
+订单明细与订单草稿目前作为独立领域模型使用，尚未接入命令行下单流程。
 
 ## 环境准备
 
@@ -79,6 +80,22 @@ CLI 从 `data/products.json` 读取商品。
 - 数量必须为正整数，不能使用布尔值。
 - `subtotal_cents()` 返回单价乘以数量的小计。
 
+## 订单草稿
+
+`app/domain/order_draft.py` 定义 `OrderDraft`。
+
+草稿使用元组保存至少一条 `OrderLine`，并禁止普通字段赋值。
+`total_cents()` 累加所有明细的小计，返回人民币整数分。
+零价商品形成的草稿可以具有零元总金额。
+
+单独验证订单草稿：
+
+```powershell
+.\.venv\Scripts\python.exe -m pytest tests/test_order_draft.py -q
+```
+
+当前阶段预期：`8 passed`。
+
 ## 自动化测试
 
 运行全部测试：
@@ -87,7 +104,7 @@ CLI 从 `data/products.json` 读取商品。
 .\.venv\Scripts\python.exe -m pytest tests -q
 ```
 
-当前阶段预期：`43 passed`。
+当前阶段预期：`51 passed`。
 
 单独验证订单明细：
 
