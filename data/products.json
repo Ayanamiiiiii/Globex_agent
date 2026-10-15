@@ -1,0 +1,17 @@
+[
+  {
+    "product_id": "P001",
+    "name": "轻便背包",
+    "price_cents": 19900
+  },
+  {
+    "product_id": "P002",
+    "name": "保温杯",
+    "price_cents": 8900
+  },
+  {
+    "product_id": "P003",
+    "name": "旅行收纳袋",
+    "price_cents": 3900
+  }
+]
