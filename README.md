@@ -1,19 +1,98 @@
 # Globex Agent 学习项目
 
-从零逐步开始搭建跨境电商Agent。
+从零逐步搭建跨境电商 Agent，按小模块开发、验证和提交。
 
-历史阶段；初始化学习仓库、Python虚拟环境的初始化、最小python入口、项目元信息配置、读取启动配置、加载本地配置、配置优先级自动化测试、最小商品数据模型。    
-当前阶段：商品价格创建校验（price_cents 必须为内置整数，且不能小于 0。）。  
+开发环境：Python 3.11，使用 uv 管理独立的 `.venv`。
+项目元信息与依赖以 `pyproject.toml` 为准。
 
-GLOBEX_SHOW_STARTUP 未设置或为 1 时显示启动信息，为 0 时关闭。  
+## 当前进度
 
-项目名称、版本、Python 要求与依赖清单记录在 pyproject.toml。  
-启动命令：`.\.venv\.Scripts\python.exe -m app`  
-测试命令：`.\.venv\Scripts\python.exe -m pytest tests/test_settings.py -q`  
-商品模型测试命令：`.\.venv\Scripts\python.exe -m pytest tests/test_product.py -q`  
+已完成：
 
-开发环境：Python 3.11，使用uv管理独立的.venv。  
+- Python 入口、启动配置和本地 `.env` 加载。
+- 商品模型与非负整数分价格校验。
+- 固定样例商品与 JSON 商品目录加载。
+- 商品名称关键词检索、最高预算筛选。
+- 命令行商品检索入口。
+- 订单明细模型：商品名称和单价快照、购买数量校验、整数分小计。
 
-GLOBEX_SHOW_STARTUP 未设置或为 1 时显示启动信息，为 0 时关闭。  
-首次使用时，将 .env.example 复制为 .env。
-配置优先级：终端环境变量 > .env > 代码默认值。
+订单明细目前作为独立领域模型使用，尚未接入命令行下单流程。
+
+## 环境准备
+
+以下命令在项目根目录执行。
+
+首次创建虚拟环境；已有可用 `.venv` 时跳过创建：
+
+```powershell
+uv venv --python 3.11 .venv
+```
+
+安装运行依赖和开发依赖：
+
+```powershell
+uv pip install --python .\.venv\Scripts\python.exe -r pyproject.toml --group dev
+```
+
+首次使用时，若没有 `.env`，将 `.env.example` 复制为 `.env`。
+已有 `.env` 应保留，不提交到 Git。
+
+配置优先级：终端环境变量 > `.env` > 代码默认值。
+
+`GLOBEX_SHOW_STARTUP` 未设置或为 `1` 时显示启动信息，
+为其他值时关闭。该开关不影响检索结果输出。
+
+## 本地运行
+
+查看命令行帮助：
+
+```powershell
+.\.venv\Scripts\python.exe -m app --help
+```
+
+搜索最高预算为 199 元的背包：
+
+```powershell
+.\.venv\Scripts\python.exe -m app --keyword 背包 --max-price-cents 19900
+```
+
+CLI 从 `data/products.json` 读取商品。
+
+所有金额均使用人民币整数分，`19900` 表示 199 元。
+不提供最高预算时不限制价格，预算为 `0` 时只匹配零价商品。
+关键词去掉两端空白后进行名称包含匹配；空关键词返回零件商品。
+
+不提供关键词时，仅按配置显示启动信息：
+
+```powershell
+.\.venv\Scripts\python.exe -m app
+```
+
+## 订单明细
+
+`app/domain/order_line.py` 定义 `OrderLine`。
+
+创建明细时复制商品编号、名称和单价，形成商品快照。
+明细禁止普通字段赋值；商品之后改名或调价，不影响已有快照。
+
+- 单价必须为非负整数分。
+- 数量必须为正整数，不能使用布尔值。
+- `subtotal_cents()` 返回单价乘以数量的小计。
+
+## 自动化测试
+
+运行全部测试：
+
+```powershell
+.\.venv\Scripts\python.exe -m pytest tests -q
+```
+
+当前阶段预期：`43 passed`。
+
+单独验证订单明细：
+
+```powershell
+.\.venv\Scripts\python.exe -m pytest tests/test_order_line.py -q
+```
+
+当前阶段预期：`9 passed`。
