@@ -17,7 +17,7 @@ def test_product_accepts_valid_price(price_cents):
 
 
 def test_product_rejects_negative_price():
-    with pytest.raises(ValueError, match="商品价格不能为负数"):
+    with pytest.raises(ValueError, match="商品价格不能为负数"):#match内容必须和抛出的异常信息相匹配，否则测试失败
         Product(product_id="P001", name="轻便背包", price_cents=-1)
 
 
