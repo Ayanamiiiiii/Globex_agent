@@ -25,11 +25,12 @@
 - 订单数据还原：从字典重新构造订单，保留编号并复用模型校验。
 - 订单文件保存：自动创建父目录，将订单写入 JSON，并拒绝覆盖已有文件。
 - 订单文件读取：从 JSON 还原订单，兼容普通 UTF-8 和带 BOM 的 UTF-8。
+- 命令行订单保存：通过 --confirm 和 --save-order 确认并保存订单。
 
 
 已实现订单确认、数据转换和 JSON 文件读写函数。
-当前命令行支持商品检索、草稿预览和内存订单确认。
-文件读写功能尚未接入命令行。
+当前命令行支持商品检索、草稿预览、订单确认与保存。
+文件读取功能尚未接入命令行。
 
 ## 环境准备
 
@@ -97,9 +98,22 @@ CLI 从 `data/products.json` 读取商品。
 .\.venv\Scripts\python.exe -m app --product-id P001 --quantity 2 --confirm
 ```
 
-`--confirm` 必须配合 `--product-id` 使用，执行后直接创建内存订单。
+`--confirm` 必须配合 `--product-id` 使用，执行后直接确认订单。
 不带 `--confirm` 时仅预览草稿。
-每次命令行确认都会生成新编号；该命令当前只创建内存订单。
+每次确认都会生成新编号；未提供 --save-order 时，订单只保存在内存中。
+
+确认并保存两件商品的订单：
+
+```powershell
+.\.venv\Scripts\python.exe -m app --product-id P001 --quantity 2 --confirm --save-order data/orders/demo-order-001.json
+```
+
+`--save-order` 必须配合 `--confirm` 使用。
+相对保存路径以当前终端工作目录为基准，也可以提供绝对路径。
+父目录自动创建；同名文件已存在时拒绝覆盖。
+
+保存失败时显示“订单保存失败”并以状态码 `2` 退出。
+未提供 `--save-order` 时，确认后的订单仅保存在内存中。
 
 ## 订单明细
 
@@ -153,7 +167,7 @@ CLI 从 `data/products.json` 读取商品。
 订单包含非空白字符串编号和一个 `OrderDraft`。
 模型字段禁止普通赋值，`total_cents()` 复用草稿的总金额。
 
-确认业务已接入命令行；文件读写函数已实现，尚未接入命令行。
+订单确认与文件保存已接入命令行；文件读取尚未接入命令行。
 
 单独验证订单模型：
 
@@ -212,7 +226,7 @@ CLI 从 `data/products.json` 读取商品。
 JSON 语法错误时抛出 `json.JSONDecodeError`。
 
 本地订单约定放在 `data/orders/`，该目录已加入 `.gitignore`。
-文件读写功能尚未接入命令行。
+文件保存可通过 --save-order 调用；文件读取尚未接入命令行。
 
 单独验证订单文件读写：
 
@@ -230,7 +244,7 @@ JSON 语法错误时抛出 `json.JSONDecodeError`。
 .\.venv\Scripts\python.exe -m pytest tests -q
 ```
 
-当前阶段预期：`92 passed`。
+当前阶段预期：`97 passed`。
 
 单独验证订单明细：
 

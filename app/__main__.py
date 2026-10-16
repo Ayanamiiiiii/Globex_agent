@@ -2,14 +2,15 @@
 import argparse
 from pathlib import Path
 
+from app.order_storage import save_order
 from app.orders import confirm_order, create_order_draft
 from app.catalog import load_products
 from app.search import search_products
 from app.settings import is_startup_message_enabled, load_local_environment
 
 def main(argv: list[str] | None = None) -> None:
-    '''执行商品检索、草稿预览与订单确认。'''
-    parser = argparse.ArgumentParser(description='本地商品检索、草稿预览与订单确认')
+    '''执行商品检索、草稿预览、订单确认与保存。'''
+    parser = argparse.ArgumentParser(description='本地商品检索、草稿预览、订单确认与保存')
 
     action = parser.add_mutually_exclusive_group()#mutually exclusive 的意思是“互不相容 / 互斥”,也就是说--keyword和--product-id不能同时使用
     action.add_argument('--keyword', help='商品名称关键词')
@@ -28,7 +29,12 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument(
         '--confirm',
         action='store_true',
-        help='确认订单（仅保存在内存中）',
+        help='确认订单，可配合 --save-order 保存',
+    )
+    parser.add_argument(
+        '--save-order',
+        type=Path,
+        help='确认后保存订单的 JSON 文件路径',
     )
 
     args = parser.parse_args(argv)
@@ -42,12 +48,14 @@ def main(argv: list[str] | None = None) -> None:
         parser.error('最高预算只用于关键词检索')
     if args.confirm and args.product_id is None:
         parser.error('确认订单需要配合商品编号使用')
+    if args.save_order is not None and not args.confirm:
+        parser.error('保存订单需要配合 --confirm 使用')
 
     load_local_environment()
 
     if is_startup_message_enabled():
         print('Globex Agent 启动成功！')
-        print('当前阶段：商品检索、草稿预览与订单确认')
+        print('当前阶段：商品检索、草稿预览、订单确认与保存')
 
     # 未提供关键词和商品编号时，保留原来的启动行为。
     if args.keyword is None and args.product_id is None:
@@ -77,8 +85,20 @@ def main(argv: list[str] | None = None) -> None:
 
         print(f'总金额: {draft.total_cents()} 分')
         if args.confirm:
+            # 确认只执行一次，保存和输出使用同一个订单。
             order = confirm_order(draft)
-            print('订单已确认（仅保存在内存中）')
+
+            if args.save_order is not None:
+                try:
+                    save_order(order, args.save_order)
+                except OSError as error:
+                    parser.error(f'订单保存失败: {error}')
+
+                print('订单已确认并保存')
+                print(f'保存位置: {args.save_order}')
+            else:
+                print('订单已确认（仅保存在内存中）')
+
             print(f'订单编号: {order.order_id}')
         return
 

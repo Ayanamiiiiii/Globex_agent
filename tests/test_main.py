@@ -7,6 +7,8 @@ import pytest
 import app.__main__ as entry
 from app.sample_data import create_sample_products
 from app.domain.order import Order
+from app.orders import confirm_order
+from app.order_storage import load_order, save_order
 
 def test_main_searches_catalog_with_budget(tmp_path, monkeypatch, capsys):
     app_dir = tmp_path / "app"
@@ -52,7 +54,7 @@ def test_main_without_keyword_only_shows_startup(tmp_path, monkeypatch, capsys):
 
     assert capsys.readouterr().out.splitlines() == [
         "Globex Agent 启动成功！",
-        "当前阶段：商品检索、草稿预览与订单确认",
+        "当前阶段：商品检索、草稿预览、订单确认与保存",
     ]
 
 
@@ -73,6 +75,12 @@ def preview_cli(monkeypatch):
         entry, "load_products", lambda _path: create_sample_products()
     )
     monkeypatch.setenv("GLOBEX_SHOW_STARTUP", "0")
+
+    # 默认禁止写文件，文件保存测试会单独启用真实保存函数。
+    def unexpected_save(_order, _path):
+        pytest.fail("本测试不应保存订单")
+
+    monkeypatch.setattr(entry, "save_order", unexpected_save)
 
 
 @pytest.mark.parametrize(
@@ -190,3 +198,105 @@ def test_main_rejects_confirmation_without_product(
 
     assert error.value.code == 2
     assert "确认订单需要配合商品编号使用" in capsys.readouterr().err
+
+def test_main_saves_confirmed_order(preview_cli, tmp_path, monkeypatch, capsys):
+    path = tmp_path / "orders" / "O001.json"
+    confirmed_orders = []
+
+    def tracked_confirm_order(draft):
+        # 记录实际确认出来的订单，检查保存的是同一份数据。
+        order = confirm_order(draft)
+        confirmed_orders.append(order)
+        return order
+
+    monkeypatch.setattr(entry, "confirm_order", tracked_confirm_order)
+    monkeypatch.setattr(entry, "save_order", save_order)
+
+    entry.main([
+        "--product-id", "P001",
+        "--quantity", "2",
+        "--confirm",
+        "--save-order", str(path),
+    ])
+
+    assert len(confirmed_orders) == 1
+    restored = load_order(path)
+    assert restored == confirmed_orders[0]
+    assert restored.total_cents() == 39800
+    assert capsys.readouterr().out.splitlines() == [
+        "订单草稿预览",
+        "P001 | 轻便背包 | 单价 19900 分 | 数量 2",
+        "总金额: 39800 分",
+        "订单已确认并保存",
+        f"保存位置: {path}",
+        f"订单编号: {restored.order_id}",
+    ]
+
+
+@pytest.mark.parametrize(
+    "arguments",
+    [
+        ["--save-order", "order.json"],
+        ["--product-id", "P001", "--save-order", "order.json"],
+    ],
+)
+def test_main_requires_confirmation_for_save(
+    preview_cli, monkeypatch, capsys, arguments
+):
+    def unexpected_catalog_load(_path):
+        pytest.fail("参数非法时不应读取商品目录")
+
+    monkeypatch.setattr(entry, "load_products", unexpected_catalog_load)
+
+    with pytest.raises(SystemExit) as error:
+        entry.main(arguments)
+
+    assert error.value.code == 2
+    assert "保存订单需要配合 --confirm 使用" in capsys.readouterr().err
+
+
+def test_main_preserves_existing_order_file(
+    preview_cli, tmp_path, monkeypatch, capsys
+):
+    path = tmp_path / "existing.json"
+    original_content = "已有订单内容"
+    path.write_text(original_content, encoding="utf-8")
+    monkeypatch.setattr(entry, "save_order", save_order)
+
+    with pytest.raises(SystemExit) as error:
+        entry.main([
+            "--product-id", "P001",
+            "--confirm",
+            "--save-order", str(path),
+        ])
+
+    captured = capsys.readouterr()
+    assert error.value.code == 2
+    assert "订单保存失败" in captured.err
+    assert "订单已确认" not in captured.out
+    assert path.read_text(encoding="utf-8") == original_content
+
+
+def test_main_reports_order_save_error(
+    preview_cli, tmp_path, monkeypatch, capsys
+):
+    path = tmp_path / "denied.json"
+
+    def fail_save(_order, _path):
+        raise PermissionError("模拟写入被拒绝")
+
+    monkeypatch.setattr(entry, "save_order", fail_save)
+
+    with pytest.raises(SystemExit) as error:
+        entry.main([
+            "--product-id", "P001",
+            "--confirm",
+            "--save-order", str(path),
+        ])
+
+    captured = capsys.readouterr()
+    assert error.value.code == 2
+    assert "订单保存失败" in captured.err
+    assert "模拟写入被拒绝" in captured.err
+    assert "订单已确认" not in captured.out
+    assert not path.exists()
