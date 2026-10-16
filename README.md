@@ -21,6 +21,7 @@
 - 订单模型：关联订单编号与草稿快照，复用总金额计算。
 - 订单确认函数：为已有草稿生成 UUID 编号，创建保留原快照的订单。
 - 命令行订单确认：通过 --confirm 显式创建内存订单。
+- 订单数据导出：将订单编号和明细快照转换为 JSON 兼容字典。
 
 
 已实现订单确认业务函数，生成的订单保存在内存中。
@@ -167,6 +168,24 @@ CLI 从 `data/products.json` 读取商品。
 
 该流程与草稿创建流程共用 `tests/test_orders.py`。
 
+## 订单数据导出
+
+`app/order_serialization.py` 提供 `order_to_dict(order)`。
+
+返回包含 `order_id` 和 `lines` 的字典。
+明细保留商品编号、名称、整数分单价和购买数量。
+修改导出数据不会影响原订单快照。
+
+当前完成数据转换，文件保存将在后续步骤接入。
+
+单独验证订单数据导出：
+
+```powershell
+.\.venv\Scripts\python.exe -m pytest tests/test_order_serialization.py -q
+```
+
+当前阶段预期：`2 passed`。
+
 ## 自动化测试
 
 运行全部测试：
@@ -175,7 +194,7 @@ CLI 从 `data/products.json` 读取商品。
 .\.venv\Scripts\python.exe -m pytest tests -q
 ```
 
-当前阶段预期：`77 passed`。
+当前阶段预期：`79 passed`。
 
 单独验证订单明细：
 
