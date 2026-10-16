@@ -24,11 +24,12 @@
 - 订单数据导出：将订单编号和明细快照转换为 JSON 兼容字典。
 - 订单数据还原：从字典重新构造订单，保留编号并复用模型校验。
 - 订单文件保存：自动创建父目录，将订单写入 JSON，并拒绝覆盖已有文件。
+- 订单文件读取：从 JSON 还原订单，兼容普通 UTF-8 和带 BOM 的 UTF-8。
 
 
-已实现订单确认、数据转换和 JSON 文件保存函数。
+已实现订单确认、数据转换和 JSON 文件读写函数。
 当前命令行支持商品检索、草稿预览和内存订单确认。
-文件保存功能尚未接入命令行。
+文件读写功能尚未接入命令行。
 
 ## 环境准备
 
@@ -152,7 +153,7 @@ CLI 从 `data/products.json` 读取商品。
 订单包含非空白字符串编号和一个 `OrderDraft`。
 模型字段禁止普通赋值，`total_cents()` 复用草稿的总金额。
 
-确认业务已接入命令行；文件保存函数已实现，尚未接入命令行。
+确认业务已接入命令行；文件读写函数已实现，尚未接入命令行。
 
 单独验证订单模型：
 
@@ -185,7 +186,7 @@ CLI 从 `data/products.json` 读取商品。
 还原时沿用原订单编号，并复用模型的单价、数量和非空明细校验。
 必需字段缺失时抛出 `KeyError`。
 
-数据转换由本模块负责，文件写入由 app/order_storage.py 处理
+数据转换由本模块负责，文件读写由 app/order_storage.py 处理。
 
 单独验证订单数据转换：
 
@@ -195,23 +196,31 @@ CLI 从 `data/products.json` 读取商品。
 
 当前阶段预期：`8 passed`。
 
-## 订单文件保存
+## 订单文件读写
 
-`app/order_storage.py` 提供 `save_order(order, path)`。
+`app/order_storage.py` 提供两个函数：
 
-调用者通过 `Path` 指定目标文件，函数自动创建父目录，以 UTF-8 保存 JSON。
-同名文件已存在时抛出 `FileExistsError`，保留原文件内容。
+- `save_order(order, path)`：将一个订单保存到新的 JSON 文件。
+- `load_order(path)`：从 JSON 文件读取并还原订单。
+
+路径由调用者通过 `Path` 指定。
+保存时自动创建父目录，以 UTF-8 写入 JSON。
+同名文件已存在时抛出 `FileExistsError`，保留原内容。
+
+读取兼容普通 UTF-8 和带 BOM 的 UTF-8，沿用原订单编号并复用模型校验。
+文件不存在时抛出 `FileNotFoundError`；
+JSON 语法错误时抛出 `json.JSONDecodeError`。
 
 本地订单约定放在 `data/orders/`，该目录已加入 `.gitignore`。
-保存功能尚未接入命令行。
+文件读写功能尚未接入命令行。
 
-单独验证订单文件保存：
+单独验证订单文件读写：
 
 ```powershell
 .\.venv\Scripts\python.exe -m pytest tests/test_order_storage.py -q
 ```
 
-当前阶段预期：`2 passed`。
+当前阶段预期：`7 passed`。
 
 ## 自动化测试
 
@@ -221,7 +230,7 @@ CLI 从 `data/products.json` 读取商品。
 .\.venv\Scripts\python.exe -m pytest tests -q
 ```
 
-当前阶段预期：`87 passed`。
+当前阶段预期：`92 passed`。
 
 单独验证订单明细：
 
