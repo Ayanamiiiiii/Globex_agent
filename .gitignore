@@ -15,3 +15,6 @@ frontend/dist/
 
 #本地工具缓存
 .cache/
+
+# 本地生成的订单文件
+/data/orders/
