@@ -22,6 +22,7 @@
 - 订单确认函数：为已有草稿生成 UUID 编号，创建保留原快照的订单。
 - 命令行订单确认：通过 --confirm 显式创建内存订单。
 - 订单数据导出：将订单编号和明细快照转换为 JSON 兼容字典。
+- 订单数据还原：从字典重新构造订单，保留编号并复用模型校验。
 
 
 已实现订单确认业务函数，生成的订单保存在内存中。
@@ -168,23 +169,29 @@ CLI 从 `data/products.json` 读取商品。
 
 该流程与草稿创建流程共用 `tests/test_orders.py`。
 
-## 订单数据导出
+## 订单数据转换
 
-`app/order_serialization.py` 提供 `order_to_dict(order)`。
+`app/order_serialization.py` 提供两个函数：
 
-返回包含 `order_id` 和 `lines` 的字典。
+- `order_to_dict(order)`：将订单转换为 JSON 兼容字典。
+- `order_from_dict(data)`：根据字典重新构造订单对象。
+
+转换格式包含 `order_id` 和 `lines`。
 明细保留商品编号、名称、整数分单价和购买数量。
 修改导出数据不会影响原订单快照。
 
-当前完成数据转换，文件保存将在后续步骤接入。
+还原时沿用原订单编号，并复用模型的单价、数量和非空明细校验。
+必需字段缺失时抛出 `KeyError`。
 
-单独验证订单数据导出：
+当前完成数据双向转换，文件保存将在后续步骤接入。
+
+单独验证订单数据转换：
 
 ```powershell
 .\.venv\Scripts\python.exe -m pytest tests/test_order_serialization.py -q
 ```
 
-当前阶段预期：`2 passed`。
+当前阶段预期：`8 passed`。
 
 ## 自动化测试
 
@@ -194,7 +201,7 @@ CLI 从 `data/products.json` 读取商品。
 .\.venv\Scripts\python.exe -m pytest tests -q
 ```
 
-当前阶段预期：`79 passed`。
+当前阶段预期：`85 passed`。
 
 单独验证订单明细：
 

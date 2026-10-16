@@ -7,7 +7,7 @@ import pytest
 from app.domain.order import Order
 from app.domain.order_draft import OrderDraft
 from app.domain.order_line import OrderLine
-from app.order_serialization import order_to_dict
+from app.order_serialization import order_from_dict, order_to_dict
 
 
 @pytest.fixture
@@ -64,3 +64,48 @@ def test_exported_data_does_not_change_order(sample_order):
     assert len(sample_order.draft.lines) == 2
     assert sample_order.draft.lines[0].unit_price_cents == 19900
     assert sample_order.total_cents() == 48700
+
+def test_order_from_dict_restores_order_from_json(sample_order):
+    text = json.dumps(order_to_dict(sample_order), ensure_ascii=False)
+    data = json.loads(text)
+
+    restored = order_from_dict(data)
+
+    # 字段值相同，但这是重新创建的订单对象。
+    assert restored == sample_order
+    assert restored is not sample_order
+    assert restored.total_cents() == 48700
+
+
+@pytest.mark.parametrize(
+    "field, value, error_type, message",
+    [
+        ("unit_price_cents", "19900", TypeError, "订单单价必须为整数分"),
+        ("quantity", 0, ValueError, "购买数量必须大于 0"),
+        ("quantity", True, TypeError, "购买数量必须为整数"),
+    ],
+)
+def test_order_from_dict_reuses_line_validation(
+    sample_order, field, value, error_type, message
+):
+    data = order_to_dict(sample_order)
+    data["lines"][0][field] = value
+
+    with pytest.raises(error_type, match=message):
+        order_from_dict(data)
+
+
+def test_order_from_dict_rejects_empty_lines(sample_order):
+    data = order_to_dict(sample_order)
+    data["lines"] = []
+
+    with pytest.raises(ValueError, match="订单草稿至少需要一条明细"):
+        order_from_dict(data)
+
+
+def test_order_from_dict_requires_quantity(sample_order):
+    data = order_to_dict(sample_order)
+    del data["lines"][0]["quantity"]
+
+    with pytest.raises(KeyError, match="quantity"):
+        order_from_dict(data)
