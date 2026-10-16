@@ -20,10 +20,11 @@
 - 命令行订单草稿预览，支持商品编号和购买数量。
 - 订单模型：关联订单编号与草稿快照，复用总金额计算。
 - 订单确认函数：为已有草稿生成 UUID 编号，创建保留原快照的订单。
+- 命令行订单确认：通过 --confirm 显式创建内存订单。
 
 
 已实现订单确认业务函数，生成的订单保存在内存中。
-当前命令行提供商品检索与草稿预览。
+当前命令行支持商品检索、草稿预览和订单确认。
 
 ## 环境准备
 
@@ -47,7 +48,7 @@ uv pip install --python .\.venv\Scripts\python.exe -r pyproject.toml --group dev
 配置优先级：终端环境变量 > `.env` > 代码默认值。
 
 `GLOBEX_SHOW_STARTUP` 未设置或为 `1` 时显示启动信息，
-为其他值时关闭。该开关不影响检索结果与草稿预览输出。
+为其他值时关闭。该开关不影响商品检索、草稿预览与订单确认输出。
 
 ## 本地运行
 
@@ -83,7 +84,17 @@ CLI 从 `data/products.json` 读取商品。
 
 省略 `--quantity` 时默认购买数量为 1。
 `--keyword` 与 `--product-id` 不能同时使用。
-最高预算用于关键词检索，购买数量用于草稿预览。
+最高预算用于关键词检索，购买数量用于草稿预览或订单确认。
+
+确认购买两件商品：
+
+```powershell
+.\.venv\Scripts\python.exe -m app --product-id P001 --quantity 2 --confirm
+```
+
+`--confirm` 必须配合 `--product-id` 使用，执行后直接创建内存订单。
+不带 `--confirm` 时仅预览草稿。
+每次确认都会生成新编号；当前订单不会保存到文件或数据库。
 
 ## 订单明细
 
@@ -104,7 +115,7 @@ CLI 从 `data/products.json` 读取商品。
 `total_cents()` 累加所有明细的小计，返回人民币整数分。
 零价商品形成的草稿可以具有零元总金额。
 
-单独验证草稿创建与订单确认流程：
+单独验证订单草稿模型：
 
 ```powershell
 .\.venv\Scripts\python.exe -m pytest tests/test_order_draft.py -q
@@ -122,7 +133,7 @@ CLI 从 `data/products.json` 读取商品。
 要求目录内商品编号唯一；找不到商品时抛出 `ValueError`。
 当前每次生成一种商品的内存草稿，数量可以为多件。
 
-单独验证草稿创建流程：
+单独验证草稿创建与订单确认流程：
 
 ```powershell
 .\.venv\Scripts\python.exe -m pytest tests/test_orders.py -q
@@ -137,7 +148,7 @@ CLI 从 `data/products.json` 读取商品。
 订单包含非空白字符串编号和一个 `OrderDraft`。
 模型字段禁止普通赋值，`total_cents()` 复用草稿的总金额。
 
-确认函数会创建此模型；命令行确认入口和订单保存流程尚未接入。
+确认业务已接入命令行；订单保存流程尚未接入。
 
 单独验证订单模型：
 
@@ -164,7 +175,7 @@ CLI 从 `data/products.json` 读取商品。
 .\.venv\Scripts\python.exe -m pytest tests -q
 ```
 
-当前阶段预期：`73 passed`。
+当前阶段预期：`77 passed`。
 
 单独验证订单明细：
 

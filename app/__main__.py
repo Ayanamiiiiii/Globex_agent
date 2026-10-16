@@ -2,18 +2,18 @@
 import argparse
 from pathlib import Path
 
-from app.orders import create_order_draft
+from app.orders import confirm_order, create_order_draft
 from app.catalog import load_products
 from app.search import search_products
 from app.settings import is_startup_message_enabled, load_local_environment
 
 def main(argv: list[str] | None = None) -> None:
-    '''执行启动配置及本地商品检索。'''
-    parser = argparse.ArgumentParser(description='本地商品检索与草稿预览')
+    '''执行商品检索、草稿预览与订单确认。'''
+    parser = argparse.ArgumentParser(description='本地商品检索、草稿预览与订单确认')
 
     action = parser.add_mutually_exclusive_group()#mutually exclusive 的意思是“互不相容 / 互斥”,也就是说--keyword和--product-id不能同时使用
     action.add_argument('--keyword', help='商品名称关键词')
-    action.add_argument('--product-id', help='预览草稿的商品编号')
+    action.add_argument('--product-id', help='购买商品的编号')
 
     parser.add_argument(
         '--max-price-cents',
@@ -23,7 +23,13 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument(
         '--quantity',
         type=int,
-        help='预览购买数量，默认 1')
+        help='购买数量，默认 1'
+    )
+    parser.add_argument(
+        '--confirm',
+        action='store_true',
+        help='确认订单（仅保存在内存中）',
+    )
 
     args = parser.parse_args(argv)
 
@@ -34,12 +40,14 @@ def main(argv: list[str] | None = None) -> None:
         parser.error('购买数量需要配合商品编号使用')
     if args.product_id is not None and args.max_price_cents is not None:
         parser.error('最高预算只用于关键词检索')
+    if args.confirm and args.product_id is None:
+        parser.error('确认订单需要配合商品编号使用')
 
     load_local_environment()
 
     if is_startup_message_enabled():
         print('Globex Agent 启动成功！')
-        print('当前阶段：商品检索与草稿预览')
+        print('当前阶段：商品检索、草稿预览与订单确认')
 
     # 未提供关键词和商品编号时，保留原来的启动行为。
     if args.keyword is None and args.product_id is None:
@@ -68,6 +76,10 @@ def main(argv: list[str] | None = None) -> None:
             print(f'{line.product_id} | {line.product_name} | 单价 {line.unit_price_cents} 分 | 数量 {line.quantity}')
 
         print(f'总金额: {draft.total_cents()} 分')
+        if args.confirm:
+            order = confirm_order(draft)
+            print('订单已确认（仅保存在内存中）')
+            print(f'订单编号: {order.order_id}')
         return
 
     matches = search_products(

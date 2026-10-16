@@ -6,6 +6,7 @@ import pytest
 
 import app.__main__ as entry
 from app.sample_data import create_sample_products
+from app.domain.order import Order
 
 def test_main_searches_catalog_with_budget(tmp_path, monkeypatch, capsys):
     app_dir = tmp_path / "app"
@@ -51,7 +52,7 @@ def test_main_without_keyword_only_shows_startup(tmp_path, monkeypatch, capsys):
 
     assert capsys.readouterr().out.splitlines() == [
         "Globex Agent 启动成功！",
-        "当前阶段：商品检索与草稿预览",
+        "当前阶段：商品检索、草稿预览与订单确认",
     ]
 
 
@@ -82,10 +83,16 @@ def preview_cli(monkeypatch):
     ],
 )
 def test_main_previews_order_draft(
-    preview_cli, capsys, arguments, quantity, total
+    preview_cli, monkeypatch, capsys, arguments, quantity, total
 ):
+    def unexpected_confirmation(_draft):
+        pytest.fail("草稿预览不应确认订单")
+
+    monkeypatch.setattr(entry, "confirm_order", unexpected_confirmation)
+
     entry.main(arguments)
 
+    # 同时检查：预览不会确认订单，输出的商品、数量和金额正确。
     assert capsys.readouterr().out.splitlines() == [
         "订单草稿预览",
         f"P001 | 轻便背包 | 单价 19900 分 | 数量 {quantity}",
@@ -124,3 +131,62 @@ def test_main_rejects_invalid_preview_arguments(
 
     assert error.value.code == 2
     assert message in capsys.readouterr().err
+
+@pytest.mark.parametrize(
+    "arguments, quantity, total",
+    [
+        (["--product-id", "P001", "--confirm"], 1, 19900),
+        (
+            ["--product-id", "P001", "--quantity", "2", "--confirm"],
+            2,
+            39800,
+        ),
+    ],
+)
+def test_main_confirms_order(
+    preview_cli, monkeypatch, capsys, arguments, quantity, total
+):
+    confirmed_drafts = []
+
+    def fake_confirm_order(draft):
+        # 记录传入的草稿，并固定编号，让输出可以稳定验证。
+        confirmed_drafts.append(draft)
+        return Order(order_id="TEST-ORDER-001", draft=draft)
+
+    monkeypatch.setattr(entry, "confirm_order", fake_confirm_order)
+
+    entry.main(arguments)
+
+    assert len(confirmed_drafts) == 1
+    assert confirmed_drafts[0].lines[0].quantity == quantity
+    assert confirmed_drafts[0].total_cents() == total
+    assert capsys.readouterr().out.splitlines() == [
+        "订单草稿预览",
+        f"P001 | 轻便背包 | 单价 19900 分 | 数量 {quantity}",
+        f"总金额: {total} 分",
+        "订单已确认（仅保存在内存中）",
+        "订单编号: TEST-ORDER-001",
+    ]
+
+
+@pytest.mark.parametrize(
+    "arguments",
+    [
+        ["--confirm"],
+        ["--keyword", "背包", "--confirm"],
+    ],
+)
+def test_main_rejects_confirmation_without_product(
+    preview_cli, monkeypatch, capsys, arguments
+):
+    def unexpected_call(_value):
+        pytest.fail("参数非法时不应读取商品或确认订单")
+
+    monkeypatch.setattr(entry, "load_products", unexpected_call)
+    monkeypatch.setattr(entry, "confirm_order", unexpected_call)
+
+    with pytest.raises(SystemExit) as error:
+        entry.main(arguments)
+
+    assert error.value.code == 2
+    assert "确认订单需要配合商品编号使用" in capsys.readouterr().err
