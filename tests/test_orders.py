@@ -1,10 +1,12 @@
 """验证根据商品编号创建订单草稿。"""
 
+from uuid import UUID
+
 import pytest
 
-from app.orders import create_order_draft
+import app.orders as orders
+from app.orders import confirm_order, create_order_draft
 from app.sample_data import create_sample_products
-
 
 def test_create_order_draft_uses_selected_product():
     products = create_sample_products()
@@ -60,3 +62,35 @@ def test_create_order_draft_reuses_quantity_validation(
 ):
     with pytest.raises(error_type, match=message):
         create_order_draft(create_sample_products(), "P001", quantity)
+
+
+def test_confirm_order_generates_id_and_preserves_draft(monkeypatch):
+    draft = create_order_draft(create_sample_products(), "P001", 2)
+
+    # 固定编号，让测试结果可以重复验证。
+    first_uuid = UUID("11111111-1111-4111-8111-111111111111")
+    second_uuid = UUID("22222222-2222-4222-8222-222222222222")
+
+    def first_uuid4():
+        return first_uuid
+
+    def second_uuid4():
+        return second_uuid
+
+    monkeypatch.setattr(orders, "uuid4", first_uuid4)
+    first = confirm_order(draft)
+
+    monkeypatch.setattr(orders, "uuid4", second_uuid4)
+    second = confirm_order(draft)
+
+    assert first.order_id == first_uuid.hex
+    assert second.order_id == second_uuid.hex
+    assert first.draft == draft
+    assert second.draft == draft
+    assert first.total_cents() == 39800
+    assert second.total_cents() == 39800
+
+
+def test_confirm_order_rejects_invalid_draft():
+    with pytest.raises(TypeError, match="订单必须关联订单草稿"):
+        confirm_order(None)

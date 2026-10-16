@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 from app.domain.order_draft import OrderDraft
 
-
+#作用是检查订单编号和订单草稿的有效性
 @dataclass(frozen=True)
 class Order:
     order_id: str

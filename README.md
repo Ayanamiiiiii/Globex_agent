@@ -19,9 +19,11 @@
 - 草稿创建业务流程：按商品编号读取目录价格，创建单商品订单草稿。
 - 命令行订单草稿预览，支持商品编号和购买数量。
 - 订单模型：关联订单编号与草稿快照，复用总金额计算。
+- 订单确认函数：为已有草稿生成 UUID 编号，创建保留原快照的订单。
 
 
-已新增独立订单模型，订单确认与保存流程将在后续接入。
+已实现订单确认业务函数，生成的订单保存在内存中。
+当前命令行提供商品检索与草稿预览。
 
 ## 环境准备
 
@@ -102,7 +104,7 @@ CLI 从 `data/products.json` 读取商品。
 `total_cents()` 累加所有明细的小计，返回人民币整数分。
 零价商品形成的草稿可以具有零元总金额。
 
-单独验证订单草稿：
+单独验证草稿创建与订单确认流程：
 
 ```powershell
 .\.venv\Scripts\python.exe -m pytest tests/test_order_draft.py -q
@@ -126,7 +128,7 @@ CLI 从 `data/products.json` 读取商品。
 .\.venv\Scripts\python.exe -m pytest tests/test_orders.py -q
 ```
 
-当前阶段预期：`6 passed`。
+当前阶段预期：`8 passed`。
 
 ## 订单模型
 
@@ -135,7 +137,7 @@ CLI 从 `data/products.json` 读取商品。
 订单包含非空白字符串编号和一个 `OrderDraft`。
 模型字段禁止普通赋值，`total_cents()` 复用草稿的总金额。
 
-当前阶段完成数据模型，确认业务与保存流程尚未接入。
+确认函数会创建此模型；命令行确认入口和订单保存流程尚未接入。
 
 单独验证订单模型：
 
@@ -145,6 +147,15 @@ CLI 从 `data/products.json` 读取商品。
 
 当前阶段预期：`6 passed`。
 
+## 确认订单
+
+`app/orders.py` 提供 `confirm_order(draft)`。
+
+函数每次调用都会重新生成随机 UUID 编号，并创建一个新的内存订单。
+订单沿用传入草稿的商品与价格快照。
+
+该流程与草稿创建流程共用 `tests/test_orders.py`。
+
 ## 自动化测试
 
 运行全部测试：
@@ -153,7 +164,7 @@ CLI 从 `data/products.json` 读取商品。
 .\.venv\Scripts\python.exe -m pytest tests -q
 ```
 
-当前阶段预期：`71 passed`。
+当前阶段预期：`73 passed`。
 
 单独验证订单明细：
 

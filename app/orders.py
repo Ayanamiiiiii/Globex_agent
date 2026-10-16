@@ -1,4 +1,8 @@
-"""创建订单草稿的业务流程。"""
+"""订单草稿创建与确认的业务流程。"""
+
+from uuid import uuid4
+
+from app.domain.order import Order
 
 from app.domain.order_draft import OrderDraft
 from app.domain.order_line import OrderLine
@@ -28,3 +32,8 @@ def create_order_draft(
 
     # 遍历全部商品后仍未匹配，才报告找不到商品。
     raise ValueError("未找到指定商品")
+
+def confirm_order(draft: OrderDraft) -> Order:
+    """为已有草稿分配编号，创建内存中的订单。"""
+    # 沿用草稿，保留其中的商品与价格快照。
+    return Order(order_id=uuid4().hex, draft=draft)
