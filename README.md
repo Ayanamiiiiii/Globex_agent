@@ -27,6 +27,7 @@
 - 订单文件读取：从 JSON 还原订单，兼容普通 UTF-8 和带 BOM 的 UTF-8。
 - 命令行订单保存：通过 --confirm 和 --save-order 确认并保存订单。
 - 命令行订单读取：通过 --load-order 展示已保存订单，保留原编号和明细快照。
+- HTTP 健康检查：通过 FastAPI 提供 GET /health 接口。
 
 
 已实现订单确认、数据转换和 JSON 文件读写函数。
@@ -89,7 +90,7 @@ uv pip install --python .\.venv\Scripts\python.exe -r pyproject.toml --group dev
 ```
 
 省略 `--quantity` 时默认购买数量为 1。
-`--keyword` 与 `--product-id` 、`--loader-order`不能同时使用。
+`--keyword`、`--product-id`、`--load-order` 三者互斥。
 最高预算用于关键词检索，购买数量用于草稿预览或订单确认。
 
 确认购买两件商品：
@@ -182,7 +183,7 @@ uv pip install --python .\.venv\Scripts\python.exe -r pyproject.toml --group dev
 订单包含非空白字符串编号和一个 `OrderDraft`。
 模型字段禁止普通赋值，`total_cents()` 复用草稿的总金额。
 
-改为：订单确认、文件保存和文件读取均已接入命令行
+订单确认、文件保存和文件读取均已接入命令行。
 
 单独验证订单模型：
 
@@ -251,6 +252,35 @@ JSON 语法错误时抛出 `json.JSONDecodeError`。
 
 当前阶段预期：`7 passed`。
 
+## HTTP 服务
+
+HTTP 入口为 `app/api.py`，提供 `GET /health` 健康检查接口。
+
+在项目根目录的第一个 PowerShell 窗口启动：
+
+```powershell
+.\.venv\Scripts\python.exe -m uvicorn app.api:app --host 127.0.0.1 --port 8001 --workers 1
+```
+
+保持服务窗口运行，在第二个 PowerShell 窗口验证：
+
+```powershell
+Invoke-RestMethod -Method Get -Uri 'http://127.0.0.1:8001/health' | ConvertTo-Json -Compress
+```
+
+预期返回 `{"status":"ok"}`。
+也可以在浏览器访问 `http://127.0.0.1:8001/health`。
+
+验证完成后，在服务窗口按 `Ctrl+C` 停止。
+
+单独验证 HTTP 接口：
+
+```powershell
+.\.venv\Scripts\python.exe -m pytest tests/test_api.py -q
+```
+
+当前阶段预期：`1 passed`。
+
 ## 自动化测试
 
 运行全部测试：
@@ -259,7 +289,7 @@ JSON 语法错误时抛出 `json.JSONDecodeError`。
 .\.venv\Scripts\python.exe -m pytest tests -q
 ```
 
-当前阶段预期：`108 passed`。
+当前阶段预期：`109 passed`。
 
 单独验证订单明细：
 
