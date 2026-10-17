@@ -28,6 +28,7 @@
 - 命令行订单保存：通过 --confirm 和 --save-order 确认并保存订单。
 - 命令行订单读取：通过 --load-order 展示已保存订单，保留原编号和明细快照。
 - HTTP 健康检查：通过 FastAPI 提供 GET /health 接口。
+- HTTP 商品检索：通过 GET /products 按关键词和最高预算返回商品。
 
 
 已实现订单确认、数据转换和 JSON 文件读写函数。
@@ -254,7 +255,7 @@ JSON 语法错误时抛出 `json.JSONDecodeError`。
 
 ## HTTP 服务
 
-HTTP 入口为 `app/api.py`，提供 `GET /health` 健康检查接口。
+HTTP 入口为 `app/api.py`，提供 `GET /health` 健康检查和 `GET /products` 商品检索接口。
 
 在项目根目录的第一个 PowerShell 窗口启动：
 
@@ -273,13 +274,29 @@ Invoke-RestMethod -Method Get -Uri 'http://127.0.0.1:8001/health' | ConvertTo-Js
 
 验证完成后，在服务窗口按 `Ctrl+C` 停止。
 
+商品检索接口为 `GET /products`：
+
+- `keyword`：必填，商品名称关键词。
+- `max_price_cents`：可选，最高单价，单位为人民币分，允许为 0。
+- 成功返回商品 JSON 数组；关键词为空或没有匹配商品时返回 `[]`。
+- 缺少关键词、预算为负数或预算不是整数时，返回 HTTP 422。
+
+服务运行期间，在另一个 PowerShell 窗口执行：
+
+```powershell
+$foundProducts = Invoke-RestMethod -Method Get -Uri 'http://127.0.0.1:8001/products?keyword=背包&max_price_cents=19900'
+ConvertTo-Json -InputObject @($foundProducts) -Depth 4
+```
+
+使用当前样例商品时，结果应包含编号为 `P001`、单价为 `19900` 分的轻便背包。
+
 单独验证 HTTP 接口：
 
 ```powershell
 .\.venv\Scripts\python.exe -m pytest tests/test_api.py -q
 ```
 
-当前阶段预期：`1 passed`。
+当前阶段预期：`8 passed`。
 
 ## 自动化测试
 
@@ -289,7 +306,7 @@ Invoke-RestMethod -Method Get -Uri 'http://127.0.0.1:8001/health' | ConvertTo-Js
 .\.venv\Scripts\python.exe -m pytest tests -q
 ```
 
-当前阶段预期：`109 passed`。
+当前阶段预期：`116 passed`。
 
 单独验证订单明细：
 
