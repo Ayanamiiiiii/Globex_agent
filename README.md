@@ -26,11 +26,11 @@
 - 订单文件保存：自动创建父目录，将订单写入 JSON，并拒绝覆盖已有文件。
 - 订单文件读取：从 JSON 还原订单，兼容普通 UTF-8 和带 BOM 的 UTF-8。
 - 命令行订单保存：通过 --confirm 和 --save-order 确认并保存订单。
+- 命令行订单读取：通过 --load-order 展示已保存订单，保留原编号和明细快照。
 
 
 已实现订单确认、数据转换和 JSON 文件读写函数。
-当前命令行支持商品检索、草稿预览、订单确认与保存。
-文件读取功能尚未接入命令行。
+当前命令行支持商品检索、草稿预览、订单确认，以及订单文件保存与读取。
 
 ## 环境准备
 
@@ -70,7 +70,7 @@ uv pip install --python .\.venv\Scripts\python.exe -r pyproject.toml --group dev
 .\.venv\Scripts\python.exe -m app --keyword 背包 --max-price-cents 19900
 ```
 
-CLI 从 `data/products.json` 读取商品。
+商品数据来源：检索和草稿创建读取商品目录；读取订单使用指定文件
 
 所有金额均使用人民币整数分，`19900` 表示 199 元。
 不提供最高预算时不限制价格，预算为 `0` 时只匹配零价商品。
@@ -89,7 +89,7 @@ CLI 从 `data/products.json` 读取商品。
 ```
 
 省略 `--quantity` 时默认购买数量为 1。
-`--keyword` 与 `--product-id` 不能同时使用。
+`--keyword` 与 `--product-id` 、`--loader-order`不能同时使用。
 最高预算用于关键词检索，购买数量用于草稿预览或订单确认。
 
 确认购买两件商品：
@@ -114,6 +114,21 @@ CLI 从 `data/products.json` 读取商品。
 
 保存失败时显示“订单保存失败”并以状态码 `2` 退出。
 未提供 `--save-order` 时，确认后的订单仅保存在内存中。
+
+读取已保存的订单：
+
+```powershell
+.\.venv\Scripts\python.exe -m app --load-order data/orders/demo-order-001.json
+```
+
+请使用实际存在的订单文件路径。
+相对路径以当前终端工作目录为基准，也可以使用绝对路径。
+
+读取沿用原订单编号和明细快照，不依赖当前商品目录。
+`--load-order`、`--keyword`、`--product-id` 三者互斥。
+读取时不能同时提供预算、购买数量、确认或保存参数。
+
+读取失败时显示“订单读取失败”，并以状态码 `2` 退出。
 
 ## 订单明细
 
@@ -167,7 +182,7 @@ CLI 从 `data/products.json` 读取商品。
 订单包含非空白字符串编号和一个 `OrderDraft`。
 模型字段禁止普通赋值，`total_cents()` 复用草稿的总金额。
 
-订单确认与文件保存已接入命令行；文件读取尚未接入命令行。
+改为：订单确认、文件保存和文件读取均已接入命令行
 
 单独验证订单模型：
 
@@ -226,7 +241,7 @@ CLI 从 `data/products.json` 读取商品。
 JSON 语法错误时抛出 `json.JSONDecodeError`。
 
 本地订单约定放在 `data/orders/`，该目录已加入 `.gitignore`。
-文件保存可通过 --save-order 调用；文件读取尚未接入命令行。
+命令行通过 --save-order 保存订单，通过 --load-order 读取订单
 
 单独验证订单文件读写：
 
@@ -244,7 +259,7 @@ JSON 语法错误时抛出 `json.JSONDecodeError`。
 .\.venv\Scripts\python.exe -m pytest tests -q
 ```
 
-当前阶段预期：`97 passed`。
+当前阶段预期：`108 passed`。
 
 单独验证订单明细：
 

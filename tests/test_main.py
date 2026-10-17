@@ -7,7 +7,7 @@ import pytest
 import app.__main__ as entry
 from app.sample_data import create_sample_products
 from app.domain.order import Order
-from app.orders import confirm_order
+from app.orders import confirm_order, create_order_draft
 from app.order_storage import load_order, save_order
 
 def test_main_searches_catalog_with_budget(tmp_path, monkeypatch, capsys):
@@ -54,7 +54,7 @@ def test_main_without_keyword_only_shows_startup(tmp_path, monkeypatch, capsys):
 
     assert capsys.readouterr().out.splitlines() == [
         "Globex Agent 启动成功！",
-        "当前阶段：商品检索、草稿预览、订单确认与保存",
+        "当前阶段：商品检索、草稿预览、订单确认及文件读写",
     ]
 
 
@@ -300,3 +300,83 @@ def test_main_reports_order_save_error(
     assert "模拟写入被拒绝" in captured.err
     assert "订单已确认" not in captured.out
     assert not path.exists()
+
+
+def test_main_loads_saved_order(preview_cli, tmp_path, monkeypatch, capsys):
+    draft = create_order_draft(create_sample_products(), "P001", 2)
+    saved_order = Order(order_id="SAVED-ORDER-001", draft=draft)
+    path = tmp_path / "saved.json"
+    save_order(saved_order, path)
+    original_bytes = path.read_bytes()
+
+    def unexpected_operation(_value):
+        pytest.fail("读取订单不应加载商品目录或确认新订单")
+
+    monkeypatch.setattr(entry, "load_products", unexpected_operation)
+    monkeypatch.setattr(entry, "confirm_order", unexpected_operation)
+
+    entry.main(["--load-order", str(path)])
+
+    assert capsys.readouterr().out.splitlines() == [
+        "已保存订单",
+        "订单编号: SAVED-ORDER-001",
+        "P001 | 轻便背包 | 单价 19900 分 | 数量 2",
+        "总金额: 39800 分",
+    ]
+    assert path.read_bytes() == original_bytes
+
+
+@pytest.mark.parametrize(
+    "extra",
+    [
+        ["--keyword", "背包"],
+        ["--product-id", "P001"],
+        ["--max-price-cents", "0"],
+        ["--quantity", "2"],
+        ["--confirm"],
+        ["--save-order", "new.json"],
+    ],
+)
+def test_main_rejects_load_order_conflicts(
+    preview_cli, monkeypatch, capsys, extra
+):
+    def unexpected_load(_path):
+        pytest.fail("参数冲突时不应读取订单")
+
+    monkeypatch.setattr(entry, "load_order", unexpected_load)
+
+    with pytest.raises(SystemExit) as error:
+        entry.main(["--load-order", "saved.json"] + extra)
+
+    captured = capsys.readouterr()
+    assert error.value.code == 2
+    assert captured.err
+    if "--confirm" in extra:
+        assert "读取订单不能同时使用预算、数量、确认或保存参数" in captured.err
+
+
+@pytest.mark.parametrize(
+    "failure",
+    [
+        FileNotFoundError("模拟订单文件不存在"),
+        ValueError("购买数量必须大于 0"),
+        TypeError("订单单价必须为整数分"),
+        KeyError("quantity"),
+    ],
+)
+def test_main_reports_order_load_error(
+    preview_cli, monkeypatch, capsys, failure
+):
+    def fail_load(_path):
+        raise failure
+
+    monkeypatch.setattr(entry, "load_order", fail_load)
+
+    with pytest.raises(SystemExit) as error:
+        entry.main(["--load-order", "saved.json"])
+
+    captured = capsys.readouterr()
+    assert error.value.code == 2
+    assert "订单读取失败" in captured.err
+    assert str(failure) in captured.err
+    assert "已保存订单" not in captured.out

@@ -2,19 +2,20 @@
 import argparse
 from pathlib import Path
 
-from app.order_storage import save_order
+from app.order_storage import load_order, save_order
 from app.orders import confirm_order, create_order_draft
 from app.catalog import load_products
 from app.search import search_products
 from app.settings import is_startup_message_enabled, load_local_environment
 
 def main(argv: list[str] | None = None) -> None:
-    '''执行商品检索、草稿预览、订单确认与保存。'''
-    parser = argparse.ArgumentParser(description='本地商品检索、草稿预览、订单确认与保存')
+    '''执行商品检索、草稿预览、订单确认及文件读写。'''
+    parser = argparse.ArgumentParser(description='本地商品检索、草稿预览、订单确认及文件读写')
 
-    action = parser.add_mutually_exclusive_group()#mutually exclusive 的意思是“互不相容 / 互斥”,也就是说--keyword和--product-id不能同时使用
+    action = parser.add_mutually_exclusive_group()#mutually exclusive 的意思是“互不相容 / 互斥”,也就是说--keyword和--product-id和--load-order不能同时使用
     action.add_argument('--keyword', help='商品名称关键词')
     action.add_argument('--product-id', help='购买商品的编号')
+    action.add_argument('--load-order', type=Path, help='读取已保存的订单 JSON 文件')
 
     parser.add_argument(
         '--max-price-cents',
@@ -39,6 +40,14 @@ def main(argv: list[str] | None = None) -> None:
 
     args = parser.parse_args(argv)
 
+    if args.load_order is not None and (
+        args.max_price_cents is not None
+        or args.quantity is not None
+        or args.confirm
+        or args.save_order is not None
+    ):
+        parser.error('读取订单不能同时使用预算、数量、确认或保存参数')
+
     # 命令行参数非法时，显示用法并以状态码 2 退出。
     if args.max_price_cents is not None and args.max_price_cents < 0:
         parser.error('最高预算不能为负数')
@@ -55,7 +64,23 @@ def main(argv: list[str] | None = None) -> None:
 
     if is_startup_message_enabled():
         print('Globex Agent 启动成功！')
-        print('当前阶段：商品检索、草稿预览、订单确认与保存')
+        print('当前阶段：商品检索、草稿预览、订单确认及文件读写')
+
+    #读取分支必须位于加载商品目录之前，这样历史订单就不依赖当前商品目录
+    if args.load_order is not None:
+        try:
+            order = load_order(args.load_order)
+        except (OSError, ValueError, TypeError, KeyError) as error:
+            parser.error(f'订单读取失败: {error}')
+
+        print('已保存订单')
+        print(f'订单编号: {order.order_id}')
+        for line in order.draft.lines:
+            print(f'{line.product_id} | {line.product_name} | 单价 {line.unit_price_cents} 分 | 数量 {line.quantity}')
+        print(f'总金额: {order.total_cents()} 分')
+
+        # 读取完成后退出，不再进入商品目录和新订单流程。
+        return
 
     # 未提供关键词和商品编号时，保留原来的启动行为。
     if args.keyword is None and args.product_id is None:
